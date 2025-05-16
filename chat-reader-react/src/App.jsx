@@ -1,204 +1,175 @@
-import { useState, useCallback, useEffect } from 'react';
-import FileLoader from './components/FileLoader';
+import React, { useState, useEffect } from 'react';
+import { AppProvider, useApp } from './contexts/AppContext';
 import ChatDisplay from './components/ChatDisplay';
-import './index.css';
-import './utils/tampermonkeyPolyfill';
-import { themes, defaultThemeName } from './themes';
+import FileLoader from './components/FileLoader';
+import { defaultTheme, themes } from './themes';
+import './App.css'; // 确保导入 App.css
 
-function App() {
-  const [chatData, setChatData] = useState(null);
-  const [error, setError] = useState(null);
-  const [isLoading, setIsLoading] = useState(false);
-  const [autoLoadAttempted, setAutoLoadAttempted] = useState(false);
+// 默认聊天数据结构 - 添加测试消息
+const defaultChatData = {
+  metadata: {
+    character_name: 'AI助手',
+    user_name: '用户',
+    create_date: new Date().toISOString()
+  },
+  messages: [
+    {
+      id: 1,
+      name: 'AI助手',
+      mes: '欢迎使用聊天记录阅读器！这是一条**加粗文本**的消息。\n\n您可以尝试上传 SillyTavern JSONL 聊天记录文件以查看更多内容。',
+      send_date: new Date().toISOString(),
+      is_user: false
+    },
+    {
+      id: 2,
+      name: '用户',
+      mes: '这是用户的消息，包含`内联代码`示例。',
+      send_date: new Date(Date.now() - 10000).toISOString(),
+      is_user: true
+    },
+    {
+      id: 3,
+      name: 'AI助手',
+      mes: '这是一个代码块示例：\n\n```js\nconsole.log("Hello World!");\nconst answer = 42;\n```\n\n代码块上方和下方的文本也会正确显示。',
+      send_date: new Date(Date.now() - 5000).toISOString(),
+      is_user: false
+    },
+    {
+      id: 4,
+      name: 'AI助手',
+      mes: '<status type="info" title="信息通知">这是一个状态块示例。</status>\n\n状态块可以用来显示重要信息。',
+      send_date: new Date(Date.now() - 2000).toISOString(),
+      is_user: false
+    }
+  ]
+};
+
+function AppContent() {
+  const { 
+    activeTheme, 
+    toggleTheme, 
+    fontSize, 
+    setFontSize, 
+    paragraphSpacing, 
+    setParagraphSpacing,
+    setMessages,
+    messages,
+    fileLoaded,
+    setFileLoaded,
+    filename,
+    setFilename
+  } = useApp();
+
+  const [darkMode, setDarkMode] = useState(false);
   
-  // Theme state
-  const [currentThemeName, setCurrentThemeName] = useState(() => {
-    return localStorage.getItem('currentThemeName') || defaultThemeName;
-  });
-  const activeTheme = themes[currentThemeName] || themes[defaultThemeName];
+  // 当暗黑模式状态改变时更新主题
+  useEffect(() => {
+    if (darkMode) {
+      document.documentElement.classList.add('dark');
+      toggleTheme('dark');
+    } else {
+      document.documentElement.classList.remove('dark');
+      toggleTheme('light');
+    }
+    
+    localStorage.setItem('darkMode', darkMode.toString());
+  }, [darkMode, toggleTheme]);
   
-  // 计算是否为暗色模式
-  const isDarkMode = activeTheme.type === 'dark';
-
-  // Font size and paragraph spacing remain as user preferences on top of themes
-  const [fontSize, setFontSize] = useState(() => {
-    const saved = localStorage.getItem('fontSize');
-    return saved ? parseFloat(saved) : 1.0;
-  });
-  const [paragraphSpacing, setParagraphSpacing] = useState(() => {
-    const saved = localStorage.getItem('paragraphSpacing');
-    return saved ? parseFloat(saved) : 1.5;
-  });
-
-  // Listen to system theme changes
+  // 检测系统暗黑模式并初始化
   useEffect(() => {
-    const mediaQuery = window.matchMedia('(prefers-color-scheme: dark)');
-    const handleChange = (e) => {
-      if (!localStorage.getItem('currentThemeName')) { // Only if user hasn't picked a theme
-        setCurrentThemeName(e.matches ? 'defaultDark' : 'defaultLight');
-      }
-    };
-    mediaQuery.addEventListener('change', handleChange);
-    return () => mediaQuery.removeEventListener('change', handleChange);
+    // 检查用户是否已设置首选项
+    const savedMode = localStorage.getItem('darkMode');
+    
+    if (savedMode !== null) {
+      // 使用用户保存的设置
+      setDarkMode(savedMode === 'true');
+    } else {
+      // 使用系统首选项
+      const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+      setDarkMode(prefersDark);
+    }
   }, []);
-
-  // When currentThemeName changes, save to localStorage
+  
+  // 模拟加载聊天数据
   useEffect(() => {
-    localStorage.setItem('currentThemeName', currentThemeName);
-  }, [currentThemeName]);
-
-  // Save other user preferences to localStorage
-  useEffect(() => {
-    localStorage.setItem('fontSize', fontSize.toString());
-  }, [fontSize]);
-
-  useEffect(() => {
-    localStorage.setItem('paragraphSpacing', paragraphSpacing.toString());
-  }, [paragraphSpacing]);
-
-  // 自动加载数据
-  useEffect(() => {
-    if (autoLoadAttempted) return;
-
-    const loadPreprocessedData = async () => {
-      setIsLoading(true);
-      setAutoLoadAttempted(true);
+    // 如果已经加载过文件，则不再加载默认数据
+    if (fileLoaded) return;
+    
+    // 如果有本地存储的数据，尝试加载
+    const savedChat = localStorage.getItem('savedChat');
+    if (savedChat) {
       try {
-        const response = await fetch('/processed_chat.json');
-        if (!response.ok) {
-          if (response.status === 404) {
-            console.log("No pre-processed chat data found (processed_chat.json), awaiting user input.");
-          } else {
-            console.error(`HTTP error! status: ${response.status} when fetching processed_chat.json`);
-          }
-          setIsLoading(false);
-          return;
-        }
-        const data = await response.json(); 
-        if (data && data.metadata && data.messages) {
-          setChatData(data);
-          console.log("Successfully loaded and parsed pre-processed chat data (processed_chat.json).");
-        } else {
-          console.error("Pre-processed chat data (processed_chat.json) is not in the expected format.");
-        }
+        const parsedData = JSON.parse(savedChat);
+        setMessages(parsedData.messages || []);
+        setFileLoaded(true);
+        setFilename('saved_chat.json');
       } catch (e) {
-        console.error("Error fetching or parsing pre-processed chat data (processed_chat.json):", e);
+        console.error('无法解析保存的聊天数据', e);
+        setMessages(defaultChatData.messages);
       }
-      setIsLoading(false);
-    };
+    } else {
+      // 否则使用默认数据
+      setMessages(defaultChatData.messages);
+    }
+  }, [fileLoaded, setMessages, setFileLoaded, setFilename]);
 
-    loadPreprocessedData();
-  }, [autoLoadAttempted]);
+  const handleFileLoaded = (data) => {
+    // 数据已经在FileLoader组件中通过setMessages设置
+    // 这里保存到本地存储
+    localStorage.setItem('savedChat', JSON.stringify({messages: data}));
+  };
 
-  // 处理文件加载
-  const handleFileLoad = useCallback(async (file) => {
-    if (!file) return;
-    setIsLoading(true);
-    setError(null);
-    setChatData(null); // Clear previous data
-
-    const reader = new FileReader();
-    reader.onload = async (event) => {
-      try {
-        const fileContent = event.target.result;
-        const lines = fileContent.split('\n');
-        if (lines.length < 1) {
-          throw new Error("File is empty or not in the expected JSONL format for manual upload.");
-        }
-
-        // First line is metadata for JSONL
-        const metadata = JSON.parse(lines[0]);
-        const messages = [];
-
-        // Subsequent lines are messages for JSONL
-        for (let i = 1; i < lines.length; i++) {
-          if (lines[i].trim() === '') continue; // Skip empty lines
-          const msg = JSON.parse(lines[i]);
-          messages.push(msg);
-        }
-        console.log("Successfully parsed manually uploaded JSONL file.");
-        setChatData({ metadata, messages });
-      } catch (e) {
-        console.error("Error parsing manually uploaded JSONL file:", e);
-        setError(`Failed to parse file: ${e.message}. Please ensure it's a valid SillyTavern JSONL chat export.`);
-        setChatData(null);
-      }
-      setIsLoading(false);
-    };
-    reader.onerror = () => {
-      console.error("Error reading manually uploaded file:", reader.error);
-      setError(`Error reading file: ${reader.error.message}`);
-      setIsLoading(false);
-    };
-    reader.readAsText(file); // For manual upload, expect JSONL
-  }, []);
-
-  // 切换暗/亮模式
-  const toggleDarkMode = () => {
-    setCurrentThemeName(isDarkMode ? 'defaultLight' : 'defaultDark');
+  // 构造传递给ChatDisplay的数据
+  const chatData = {
+    metadata: defaultChatData.metadata,
+    messages: messages || []
   };
 
   return (
-    <div className={`min-h-screen transition-colors duration-300 ${isDarkMode ? 'bg-gray-900 text-gray-100' : 'bg-gray-50 text-gray-900'}`}>
-      <header className={`w-full py-8 ${isDarkMode ? 'bg-indigo-900' : 'bg-gradient-to-r from-indigo-500 to-purple-600'}`}>
-        <div className="max-w-6xl mx-auto px-6 flex justify-between items-center">
-          <h1 className={`text-4xl md:text-5xl font-bold text-white text-center`}>
-            聊天记录阅读器
-            <span className="block text-sm md:text-base font-normal mt-2 opacity-80">专为 SillyTavern 聊天记录设计</span>
+    <div className={`min-h-screen ${darkMode ? 'dark bg-gray-900' : 'bg-gray-100'} transition-colors duration-300`}>
+      <div className="container mx-auto px-4 py-8">
+        <div className="flex justify-between items-center mb-6">
+          <h1 className={`text-2xl font-bold ${darkMode ? 'text-white' : 'text-gray-800'}`}>
+            聊天记录阅读器专为 SillyTavern 聊天记录设计
           </h1>
-          <div className="flex items-center gap-3">
-            <button 
-              onClick={toggleDarkMode} 
-              className={`px-4 py-2 rounded-lg flex items-center transition-all duration-300 ${
-                isDarkMode 
-                  ? 'bg-yellow-500 text-gray-900 hover:bg-yellow-400' 
-                  : 'bg-indigo-900 text-white hover:bg-indigo-800'
-              } shadow-lg`}
-              aria-label={isDarkMode ? "切换到亮色模式" : "切换到暗色模式"}
-            >
-              <i className={`fas ${isDarkMode ? 'fa-sun' : 'fa-moon'} mr-2`}></i>
-              <span className="hidden sm:inline">{isDarkMode ? '亮色模式' : '暗色模式'}</span>
-            </button>
-          </div>
+          <button 
+            onClick={() => setDarkMode(prev => !prev)}
+            className={`p-2 rounded-full ${darkMode ? 'bg-gray-700 text-gray-300' : 'bg-gray-200 text-gray-700'}`}
+            aria-label={darkMode ? '切换到亮色模式' : '切换到暗色模式'}
+          >
+            {darkMode ? (
+              <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z" />
+              </svg>
+            ) : (
+              <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z" />
+              </svg>
+            )}
+          </button>
         </div>
-      </header>
-
-      <main 
-        id="chat-content" 
-        className={`w-full max-w-6xl mx-auto px-6 py-10 shadow-xl rounded-lg my-8 ${isDarkMode ? 'bg-gray-900' : 'bg-white'}`}
-      >
-        {!chatData && !isLoading && (
-          <FileLoader onFileLoad={handleFileLoad} isLoading={isLoading} darkMode={isDarkMode} />
-        )}
-
-        {error && (
-          <div className={`mt-6 p-4 ${isDarkMode ? 'bg-red-900 border-red-700 text-red-200' : 'bg-red-100 border-red-400 text-red-700'} border rounded-md`}>
-            <p className="font-semibold">错误:</p>
-            <p>{error}</p>
-          </div>
-        )}
-
-        {chatData && (
+        <FileLoader onFileLoaded={handleFileLoaded} />
+        <main className="mt-6">
           <ChatDisplay 
             chatData={chatData} 
             activeTheme={activeTheme}
-            changeTheme={setCurrentThemeName}
             fontSize={fontSize}
             setFontSize={setFontSize}
             paragraphSpacing={paragraphSpacing}
             setParagraphSpacing={setParagraphSpacing}
+            toggleTheme={toggleTheme}
           />
-        )}
-      </main>
-
-      <footer 
-        className={`text-center py-6 ${isDarkMode ? 'bg-gray-900 text-gray-500' : 'bg-gray-50 text-gray-600'}`}
-      >
-        <p className="text-sm">
-          聊天记录阅读器 v0.1 - 专为 SillyTavern 聊天记录设计
-        </p>
-      </footer>
+        </main>
+      </div>
     </div>
+  );
+}
+
+function App() {
+  return (
+    <AppProvider>
+      <AppContent />
+    </AppProvider>
   );
 }
 

@@ -1,4 +1,6 @@
-@import "tailwindcss";
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
 
 /* 全局字体和样式设置 */
 body {
@@ -14,25 +16,6 @@ h1, h2, h3, h4, h5, h6 {
   font-family: 'Noto Serif SC', serif;
   font-weight: 600;
   line-height: 1.2;
-}
-
-/* 卡片过渡效果 */
-.card-transition {
-  transition: all 0.3s cubic-bezier(0.25, 0.8, 0.25, 1);
-}
-
-.card-hover:hover {
-  transform: translateY(-2px);
-  box-shadow: 0 10px 20px rgba(0, 0, 0, 0.1);
-}
-
-/* 细节标签动画 */
-.details-summary .fas {
-  transition: transform 0.2s ease;
-}
-
-.details-open .fas {
-  transform: rotate(90deg);
 }
 
 /* 消息过渡效果 */
@@ -82,41 +65,4 @@ h1, h2, h3, h4, h5, h6 {
 .code-block-container pre {
   font-family: 'Fira Code', 'Source Code Pro', Consolas, Monaco, 'Andale Mono', monospace;
   counter-reset: line;
-}
-
-/* 表格编辑样式 */
-.table-edit-container {
-  transition: box-shadow 0.2s ease;
-}
-
-.table-edit-container:hover {
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
-}
-
-/* 选项悬停效果 */
-li:hover .option-number {
-  transform: translateX(2px);
-}
-
-/* 标题装饰 */
-.fancy-heading {
-  position: relative;
-  display: inline-block;
-}
-
-.fancy-heading::after {
-  content: '';
-  position: absolute;
-  bottom: -4px;
-  left: 0;
-  width: 100%;
-  height: 2px;
-  background: linear-gradient(to right, #6366f1, #8b5cf6);
-  transform: scaleX(0.7);
-  transform-origin: left;
-  transition: transform 0.3s ease;
-}
-
-.fancy-heading:hover::after {
-  transform: scaleX(1);
 }

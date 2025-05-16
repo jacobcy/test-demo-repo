@@ -1,16 +1,3 @@
----
-description: 
-globs: 
-alwaysApply: true
----
-- react项目路径在 chat-reader-react, 依赖安装在这个目录下,使用pnpm工具
-- 本项目仅作为demo演示,不考虑性能优化,以及其他非核心功能
-- 需要更新的文档：
-  * `chat-reader-react/PROJECT_SUMMARY.md` 项目概要
-  * `DIRECTORY_STRUCTURE.md` | 目录结构说明文档 |
-  * `COMPONENTS.md` | 组件说明文档 
-  * `UTILS_FUNCTIONS.md` | 工具函数说明文档
-
 # chat-reader-react 项目总结
 
 本文档提供了项目中所有关键文件的概述和作用说明。
@@ -96,3 +83,18 @@ alwaysApply: true
 | 目录 | 说明 |
 |-----|------|
 | `fonts/` | 字体文件 |
+
+## 项目重构进度
+
+参考"React 项目修复与重构方案.txt"文件了解重构计划。已完成的主要任务包括：
+
+1. 依赖审计与更新
+2. 特殊块组件系列的创建
+3. 工具函数的重组和优化
+4. 目录结构的重新组织
+5. 样式系统统一（改用Tailwind类）
+6. Message.jsx组件的重构
+7. themes.js主题系统的优化
+8. tailwind.config.js的增强
+9. 清理了过时的contentProcessors.js和formatting目录下的文件
+10. 添加了FileLoader.jsx组件的自动加载功能 
